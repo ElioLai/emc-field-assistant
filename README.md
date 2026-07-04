@@ -1,6 +1,6 @@
-# EMC Field Assistant
+# EMC Photo
 
-EMC Field Assistant is an Android app for organizing photos during EMC test work. It helps record photos by project, sample/model, test item, and photo category while the test is happening, instead of sorting and renaming photos manually after the test.
+EMC Photo is an Android app for organizing photos during EMC test work. It helps record photos by project, sample/model, test item, and photo category while the test is happening, instead of sorting and renaming photos manually after the test.
 
 The app is designed around a workflow similar to the project/test-item logic used by an older internal EMC64 workflow, but this repository does not include EMC64 or any EMC64 automation code.
 
@@ -21,6 +21,7 @@ Photos are saved under the Android Pictures directory in a structured folder lay
 - CSV import for model and configuration options.
 - Existing project folder selection for continuing or补拍 existing work.
 - Grouped EMC test items.
+- Model and configuration switching directly on the capture screen for continuous test work.
 - Photo categories such as overview, detail, vertical polarity, and horizontal polarity.
 - CameraX-based photo capture.
 - Volume-down hardware shutter support while inside the app.

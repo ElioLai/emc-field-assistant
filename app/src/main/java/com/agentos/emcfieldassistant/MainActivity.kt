@@ -48,6 +48,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -62,6 +63,8 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
@@ -92,6 +95,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
@@ -340,7 +344,7 @@ private fun EmcFieldAssistantApp() {
                             TopAppBar(
                                 title = {
                                     Column {
-                                        Text("EMC现场助手", fontWeight = FontWeight.Bold)
+                                        Text("EMC拍照", fontWeight = FontWeight.Bold)
                                         Text(
                                             text = project.workOrder.ifBlank { "未绑定工单" },
                                             style = MaterialTheme.typography.labelMedium,
@@ -401,6 +405,11 @@ private fun EmcFieldAssistantApp() {
                             model = selectedModel,
                             config = selectedConfig,
                             item = current.item,
+                            onModelChange = {
+                                selectedModel = it
+                                selectedConfig = it.configs.firstOrNull() ?: ConfigOption()
+                            },
+                            onConfigChange = { selectedConfig = it },
                             onBack = {
                                 photoCountRefreshKey++
                                 screen = Screen.Home
@@ -937,6 +946,8 @@ private fun CaptureScreen(
     model: ModelConfig,
     config: ConfigOption,
     item: TestItem,
+    onModelChange: (ModelConfig) -> Unit,
+    onConfigChange: (ConfigOption) -> Unit,
     onBack: () -> Unit
 ) {
     BackHandler(onBack = onBack)
@@ -944,6 +955,7 @@ private fun CaptureScreen(
     val context = LocalContext.current
     val photoCategories = photoCategoriesFor(item)
     var selectedCategory by remember(item.code) { mutableStateOf(photoCategories.first()) }
+    val controlsScrollState = rememberScrollState()
     var imageCapture by remember { mutableStateOf<ImageCapture?>(null) }
     var targetRotation by remember { mutableStateOf(Surface.ROTATION_0) }
     var hasCameraPermission by remember {
@@ -1058,10 +1070,29 @@ private fun CaptureScreen(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .heightIn(max = 260.dp)
                 .background(Color(0xFFF7F8F8))
+                .verticalScroll(controlsScrollState)
                 .padding(horizontal = 10.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
+            CaptureSelectionDropdowns(
+                project = project,
+                selectedModel = model,
+                selectedConfig = config,
+                onModelChange = onModelChange,
+                onConfigChange = onConfigChange
+            )
+            Text("照片类别", fontWeight = FontWeight.Bold)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                photoCategories.forEach { category ->
+                    FilterChip(
+                        selected = selectedCategory == category,
+                        onClick = { selectedCategory = category },
+                        label = { Text(category) }
+                    )
+                }
+            }
             Button(
                 onClick = {
                     val capture = imageCapture ?: return@Button
@@ -1083,15 +1114,117 @@ private fun CaptureScreen(
             ) {
                 Text("拍照并保存到 ${item.folderName}")
             }
-            Text("照片类别", fontWeight = FontWeight.Bold)
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                photoCategories.forEach { category ->
-                    FilterChip(
-                        selected = selectedCategory == category,
-                        onClick = { selectedCategory = category },
-                        label = { Text(category) }
-                    )
-                }
+        }
+    }
+}
+
+@Composable
+private fun CaptureSelectionDropdowns(
+    project: ProjectConfig,
+    selectedModel: ModelConfig,
+    selectedConfig: ConfigOption,
+    onModelChange: (ModelConfig) -> Unit,
+    onConfigChange: (ConfigOption) -> Unit
+) {
+    val configs = selectedModel.configs.distinct()
+    if (project.models.size <= 1 && configs.size <= 1) return
+
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+        if (project.models.size > 1) {
+            ModelDropdown(
+                selectedModel = selectedModel,
+                models = project.models,
+                onModelChange = onModelChange,
+                modifier = Modifier.weight(1f)
+            )
+        }
+
+        if (configs.size > 1) {
+            ConfigDropdown(
+                selectedConfig = selectedConfig,
+                configs = configs,
+                onConfigChange = onConfigChange,
+                modifier = Modifier.weight(1f)
+            )
+        }
+    }
+}
+
+@Composable
+private fun ModelDropdown(
+    selectedModel: ModelConfig,
+    models: List<ModelConfig>,
+    onModelChange: (ModelConfig) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Box(modifier = modifier) {
+        OutlinedButton(
+            onClick = { expanded = true },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(42.dp),
+            shape = RoundedCornerShape(10.dp)
+        ) {
+            Text(
+                "型号：${selectedModel.role} ${selectedModel.name}",
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            modifier = Modifier.heightIn(max = 280.dp)
+        ) {
+            models.forEach { model ->
+                DropdownMenuItem(
+                    text = { Text("${model.role} ${model.name}") },
+                    onClick = {
+                        expanded = false
+                        onModelChange(model)
+                    }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ConfigDropdown(
+    selectedConfig: ConfigOption,
+    configs: List<ConfigOption>,
+    onConfigChange: (ConfigOption) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Box(modifier = modifier) {
+        OutlinedButton(
+            onClick = { expanded = true },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(42.dp),
+            shape = RoundedCornerShape(10.dp)
+        ) {
+            Text(
+                "配置：${selectedConfig.displayLabel}",
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            modifier = Modifier.heightIn(max = 280.dp)
+        ) {
+            configs.forEach { config ->
+                DropdownMenuItem(
+                    text = { Text(config.displayLabel) },
+                    onClick = {
+                        expanded = false
+                        onConfigChange(config)
+                    }
+                )
             }
         }
     }
@@ -1214,7 +1347,7 @@ private fun buildPhotoSpec(
     val fileName = "${nameParts.joinToString("_") { it.toFileNamePart() }}.jpg"
     val relativePath = listOf(
         Environment.DIRECTORY_PICTURES,
-        "EMC现场助手",
+        "EMC拍照",
         project.folderName.ifBlank { "未命名工单" },
         modelSubfolder(project, model),
         item.folderName
@@ -1224,6 +1357,7 @@ private fun buildPhotoSpec(
 
 private fun photoCategoriesFor(item: TestItem): List<String> {
     return when (item.code) {
+        "样品铭牌外观" -> listOf("外观", "铭牌", "附件")
         "RE", "REHF", "RS" -> listOf("极性V", "极性H", "局部", "异常")
         "CE" -> listOf("相位N", "相位L", "局部", "异常")
         else -> listOf("全景", "局部", "异常")
@@ -1241,7 +1375,7 @@ private fun testAxisFor(item: TestItem, category: String): String {
 private fun previewSavePath(project: ProjectConfig, model: ModelConfig): String {
     return listOf(
         Environment.DIRECTORY_PICTURES,
-        "EMC现场助手",
+        "EMC拍照",
         project.folderName.ifBlank { "未命名工单" },
         modelSubfolder(project, model)
     ).filter { it.isNotBlank() }.joinToString("/") + "/"
@@ -1600,7 +1734,7 @@ private fun inferConfigFromPhotoFileName(fileName: String): String? {
     return parts.subList(1, categoryIndex).joinToString("_").ifBlank { "默认" }
 }
 
-private val KnownPhotoCategoriesForImport = listOf("全景", "局部", "极性V", "极性H", "相位N", "相位L", "异常", "局部细节", "其他")
+private val KnownPhotoCategoriesForImport = listOf("全景", "局部", "极性V", "极性H", "相位N", "相位L", "异常", "外观", "铭牌", "附件", "局部细节", "其他")
 
 private fun String.sanitizePathPart(): String {
     return trim()
